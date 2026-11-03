@@ -5,21 +5,24 @@
 
 SHELL := /bin/bash
 
-mProj = WP-make-core
-mProduct = dist/make-core-VERSION.zip
+# Plugin name (slug)
+mName = turtle-make-civ-cor
+
+# Repository name
+mProj = WP-$(mName)
 
 mBuildList = \
-    dist/make-core \
-    dist/make-core/make-core.php \
-    dist/make-core/readme.txt \
-    dist/make-core/LICENSE
+	dist/$(mName) \
+	dist/$(mName)/$(mName).php \
+	dist/$(mName)/readme.txt \
+	dist/$(mName)/LICENSE
 
 mDocList = \
-    README.html \
-    README.md \
-    install-civ-core.html \
-    install-civ-core.md \
-    install-civ-core.org
+	docs/install-civ-core.html \
+	docs/index.html
+
+# Get branch name
+mBranch = $$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
 mServer = moria.whyayh.com
 mPubDev = /rel/development/software/own/$(mProj)
@@ -28,6 +31,9 @@ mPubRel = /rel/released/software/own/$(mProj)
 # --------------------
 
 usage :
+	@echo
+	@echo '===================='
+	@echo 'Usage'
 	@echo "update - get latest version from github"
 	@echo "build - $(mProduct)"
 	@echo "incPatch, incMinor, or incMajor - before save or publish"
@@ -36,29 +42,64 @@ usage :
 	@echo "publish - tag, ci, push to develop, merge to main,"
 	@echo "    push to main, copy to $(mPubRel)"
 	@echo
-	@echo "VERSION VERSION-dev VERSION-rel"
-	@echo $$(cat VERSION*)
+	@echo '===================='
+	@echo "VERSION: $$(cat VERSION)"
+	@echo "VERSION-dev: $$(cat VERSION-dev)"
+	@echo "VERSION-pub: $$(cat VERSION-pub)"
+	@echo "VERSION-rel: $$(cat VERSION-rel)"
+	@echo
+	@echo '===================='
 	@git st
 
-update :
-	git co develop
-	git pull origin develop
+verify :
+	@echo
+	@echo '===================='
+	@echo 'Verify Requirements'
+	which emacs >/dev/null 2>&1
+	which git >/dev/null 2>&1
+	which make >/dev/null 2>&1
+	which pandoc >/dev/null 2>&1
+	which perl >/dev/null 2>&1
+	which php >/dev/null 2>&1
+	which pod2markdown >/dev/null 2>&1
+	which pod2pdf >/dev/null 2>&1
+	which sed >/dev/null 2>&1
+	which tidy >/dev/null 2>&1
+	which zip >/dev/null 2>&1
+	which ./.git/hooks/pre-commit >/dev/null 2>&1
+	grep -q 'ci = commit' ./.git/config ./.git/config
+	grep -q 'co = checkout' ./.git/config ./.git/config
+	grep -q 'st = status -s' ./.git/config ./.git/config
+	grep -q 'pre-commit-enabled = true' ./.git/config
+	grep -q 'check-whitespace = true' ./.git/config
+	grep -q 'check-for-tabs = true' ./.git/config
 
-build : dist-clean update $(mDocList) $(mProduct)
+update :
+	git co $(mBranch)
+	git pull origin $(mBranch)
+
+build : dist-clean update doc $(mProduct)
 	@echo 'If OK, make save'
+
+doc : $(mDocList)
 
 save development : check-dev
 	-git ci -am Updated
-	git push origin develop
+	git push origin $(mBranch)
 	-ssh $(mServer) mkdir -p $(mPubDev)
-	rsync -a $(mDocList) readme.txt dist/make-core-$$(cat VERSION).zip $(mServer):$(mPubDev)
+	rsync -a docs/* dist/$(mName)/readme.txt dist/$(mName)-$$(cat VERSION).zip $(mServer):$(mPubDev)
+	ssh $(mServer) mv -f $(mPubDev)/index.html $(mPubDev)/README.html
 	cp VERSION VERSION-dev
 	git ci -am Updated
-	git push origin develop
+	git push origin $(mBranch)
 	@echo 'If OK, make publish'
 
-publish release : check-rel
-	git tag -f "ver-$$(cat VERSION)"
+publish release : check-pub
+	if [[ "$(mBranch)" != "develop" ]]; then exit 1; fi
+	if [[ ! -f dist/$(mName)-$$(cat VERSION-dev).zip ]]; then exit 1; fi
+	-git ci -am Updated
+	git tag -f "ver-$$(cat VERSION-dev)"
+	-git push origin --delete "ver-$$(cat VERSION-dev)"
 	git push --tags origin develop
 	git co main
 	git pull --tags origin main
@@ -66,11 +107,12 @@ publish release : check-rel
 	git push --tags origin main
 	git co develop
 	-ssh $(mServer) mkdir -p $(mPubRel)
-	rsync -a $(mDocList) readme.txt dist/make-core-$$(cat VERSION).zip $(mServer):$(mPubRel)
-	cp VERSION VERSION-rel
-	incver.sh -p
-	git ci -am Updated
+	rsync -a docs/* readme.txt dist/$(mName)-$$(cat VERSION-dev).zip $(mServer):$(mPubRel)
+	ssh $(mServer) mv -f $(mPubRel)/index.html $(mPubRel)/README.html
+	cp VERSION VERSION-pub
+	-git ci -am Updated
 	git push origin develop
+	@echo 'If OK, make release'
 	@echo 'If done, make dist-clean'
 
 clean :
@@ -84,30 +126,12 @@ dist-clean : clean
 # git push origin --delete v2.1.1
 
 # --------------------
-# Work Targets
+# Work Targets (sorted)
 
 $(mProduct) : $(mBuildList)
-	php -l make-core.php
-	cd dist; zip -r make-core-$$(cat ../VERSION).zip make-core
+	php -l $(mName).php
+	cd dist; zip -r $(mName)-$$(cat ../VERSION).zip $(mName)
 	-touch $@
-
-README.html : README.org VERSION
-	org2html.sh -i README.org -o $@ -s 2
-	sed -i "s/VERSION/$$(cat VERSION)/" $@
-
-README.md : README.org VERSION
-	pandoc -f org -t markdown <README.org | awk '/```{=html}/,/```/ {next} {print $$0}' >$@
-	sed -i "s/VERSION/$$(cat VERSION)/" $@
-	sed -i 's/^\[version]/![version]/' $@
-	sed -i 's/^\[WordPress]/![WordPress]/' $@
-
-install-civ-core.html : install-civ-core.org VERSION
-	org2html.sh -i install-civ-core.org -o $@ -s 2
-	sed -i "s/VERSION/$$(cat VERSION)/" $@
-
-install-civ-core.md : install-civ-core.org VERSION
-	pandoc -f org -t markdown <install-civ-core.org >$@
-	sed -i "s/VERSION/$$(cat VERSION)/" $@
 
 check-dev :
 	if diff -q VERSION VERSION-dev >/dev/null 2>&1; then \
@@ -116,36 +140,48 @@ check-dev :
 		exit 1; \
 	fi
 
-check-rel :
-	if diff -q VERSION VERSION-rel >/dev/null 2>&1; then \
+check-pub :
+	if diff -q VERSION VERSION-pub >/dev/null 2>&1; then \
 		echo "Released versions must be different."; \
 		echo "increment and rebuild."; \
 		exit 1; \
 	fi
 
-# --------------------
-# Single Targets
+dist/$(mName) :
+	mkdir -p $@
 
-VERSION :
-	echo '0.0.0' >$@
+dist/$(mName)/$(mName).php : VERSION $(mName).php
+	sed "s/VERSION/$$(cat VERSION)/" <$(mName).php >$@
 
-incPatch : VERSION
-	incver.sh -p
+dist/$(mName)/LICENSE : LICENSE
+	-cp $? $@
 
-incMinor : VERSION
-	incver.sh -m
+dist/$(mName)/readme.txt : VERSION readme.txt
+	sed "s/VERSION/$$(cat VERSION)/" <$? >$@
+
+docs/index.html : README.org VERSION
+	bin/rm-trailing-sp $?
+	sed -i "s/^ver-[0-9.]*/ver-$$(cat VERSION)/" README.org
+	bin/org2html.sh -i README.org -o $@ -s 2
+	sed -i 's/\&amp;/\&/g' $@
+
+docs/install-civ-core.html : install-civ-core.org VERSION
+	org2html.sh -i install-civ-core.org -o $@ -s 2
+	sed -i "s/VERSION/$$(cat VERSION)/" $@
 
 incMajor : VERSION
 	incver.sh -M
 
-dist/make-core :
-	mkdir -p $@
+incMinor : VERSION
+	incver.sh -m
 
-dist/make-core/make-core.php : VERSION make-core.php
-	sed "s/VERSION/$$(cat VERSION)/" <make-core.php >$@
+incPatch : VERSION
+	incver.sh -p
 
-dist/make-core/readme.txt : VERSION readme.txt
-	sed "s/VERSION/$$(cat VERSION)/" <$? >$@
+VERSION :
+	echo '0.0.0' >$@
 
-dist/make-core/LICENSE : LICENSE
-	-cp $? $@
+# ========================================
+# Plugin Owner Only
+
+# TBD
