@@ -1,4 +1,4 @@
-# Makefile for github.com:TurtleEngr/WP-make-core
+# Makefile for github.com:TurtleEngr/WP-turtle-make-civ-core
 
 # ----------
 # Macros
@@ -166,7 +166,7 @@ docs/index.html : README.org VERSION
 	sed -i 's/\&amp;/\&/g' $@
 
 docs/install-civ-core.html : install-civ-core.org VERSION
-	org2html.sh -i install-civ-core.org -o $@ -s 2
+	bin/org2html.sh -i install-civ-core.org -o $@ -s 2
 	sed -i "s/VERSION/$$(cat VERSION)/" $@
 
 incMajor : VERSION

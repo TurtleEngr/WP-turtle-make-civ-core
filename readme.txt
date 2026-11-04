@@ -1,12 +1,14 @@
-=== make-core ===
-Description: Make the current WordPress site ready to be a core site.
+=== turtle-make-civ-core ===
 Contributors: turtle-engr
 Tags: plugin, make-core, cleanup
 Requires at least: 6.0
+Requires PHP: 8.0
 Tested up to: 7.1
 Stable tag: VERSION
 License: GPLv2
 License URI: <http://www.gnu.org/licenses/gpl-2.0.html>
+
+Make the current WordPress site ready to be a core site.
 
 == Description ==
 
@@ -27,13 +29,13 @@ When you press the Delete button:
 - Media files that are not referenced will be deleted
 
 For complete documentation and the work flow for making a core site
-see: https://github.com/TurtleEngr/WP-make-core/tree/main
+see: https://github.com/TurtleEngr/WP-turtle-make-civ-core/tree/main
 
 == Installation ==
 
-Source: https://moria.whyayh.com/rel/released/software/own/make-core
+Source: https://moria.whyayh.com/rel/released/software/own/WP-turtle-make-civ-core
 
-1. Download the make-core-VERSION.zip file.
+1. Download the turtle-make-civ-core-VERSION.zip file.
 2. Use Add Plugins, Upload Plugin, Install, Activate
 
 == Changelog ==

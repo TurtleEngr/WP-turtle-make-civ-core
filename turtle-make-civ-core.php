@@ -1,10 +1,11 @@
 <?php
 /*
  * Plugin Name: Turtle Make Civ Core
- * Plugin URI: https://github.com/TurtleEngr/WP-turtle-make-civ-core/tree/main
+ * Plugin URI: https://github.com/TurtleEngr/WP-turtle-make-civ-core/
  * Description: Make the current WordPress site ready to be a core site.
  * Version:     VERSION
- * Text Domain: turtle-make-civ-core
+ * Requires at least: 6.0
+ * Requires Plugins: contact-form-7, flamingo
  * Author:      TurtleEngr
  * Author URI: https://github.com/TurtleEngr
  * License:     GPL-2.0
