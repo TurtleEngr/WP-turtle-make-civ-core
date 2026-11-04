@@ -1,0 +1,37 @@
+* prompt-submit
+
+** prompt 4
+
++ Fix the "Plugin Check" problems found, using the "Submition
+  Guidelines" to fix up the turtle-make-civ-core plugin. Also look for
+  any coding errors.
+
++ The code can be found at:
+  https://github.com/TurtleEngr/WP-turtle-make-civ-core/tree/feature/rename
+
++ Follow the directions in CLAUDE.org
+
+*** "Plugin Check" found these problems. Please fix.
+FILE: turtle-make-civ-core.php
+| Line | Col | Type    | Code                                                           | Message                                                                                                             |
+|   95 |  14 | ERROR   | WordPress.WP.AlternativeFunctions.parse_url_parse_url          | parse_url() is discouraged because of inconsistency in the output across PHP versions; use wp_parse_url() instead.  |
+|  115 |  15 | ERROR   | WordPress.WP.AlternativeFunctions.parse_url_parse_url          | parse_url() is discouraged because of inconsistency in the output across PHP versions; use wp_parse_url() instead.  |
+|  140 |  14 | ERROR   | WordPress.WP.AlternativeFunctions.parse_url_parse_url          | parse_url() is discouraged because of inconsistency in the output across PHP versions; use wp_parse_url() instead.  |
+|  144 |  15 | ERROR   | WordPress.WP.AlternativeFunctions.parse_url_parse_url          | parse_url() is discouraged because of inconsistency in the output across PHP versions; use wp_parse_url() instead.  |
+|  517 |  14 | ERROR   | WordPress.WP.AlternativeFunctions.unlink_unlink                | unlink() is discouraged. Use wp_delete_file() to delete a file.                                                     |
+|  568 |  14 | ERROR   | WordPress.WP.AlternativeFunctions.file_system_operations_rmdir | File operations should use WP_Filesystem methods instead of direct PHP filesystem calls. Found: rmdir().            |
+|  579 |  17 | WARNING | WordPress.Security.NonceVerification.Missing                   | Processing form data without nonce verification.                                                                    |
+|  582 |  47 | WARNING | WordPress.Security.NonceVerification.Missing                   | Processing form data without nonce verification.                                                                    |
+|  653 |  24 | WARNING | WordPress.Security.NonceVerification.Missing                   | Processing form data without nonce verification.                                                                    |
+|  655 |  24 | WARNING | WordPress.Security.NonceVerification.Missing                   | Processing form data without nonce verification.                                                                    |
+|  103 |  12 | WARNING | WordPress.DB.DirectDatabaseQuery.DirectQuery                   | Use of a direct database call is discouraged.                                                                       |
+|  103 |  12 | WARNING | WordPress.DB.DirectDatabaseQuery.NoCaching                     | Direct database call without caching detected. Consider using wp_cache_get() / wp_cache_set() or wp_cache_delete(). |
+
+*** "Submition Guidelines"
++ https://developer.wordpress.org/plugins/wordpress-org/detailed-plugin-guidelines/
++ https://developer.wordpress.org/plugins/plugin-basics/
++ https://developer.wordpress.org/apis/security/nonces/ - for a form
++ https://wordpress.org/plugins/files/2016/06/readme.txt - syntax example
++ https://developer.wordpress.org/plugins/wordpress-org/how-your-readme-txt-works/
++ https://developer.wordpress.org/apis/security/
++ https://developer.wordpress.org/apis/security/escaping/

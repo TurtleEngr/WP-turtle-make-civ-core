@@ -17,8 +17,8 @@
  * Constant prefix: tmcc_c
  * Global variable prefix: tmcc_g
  * Function prefix: tmcc_f
- * Local paramvars: tVar
- * Local temp vars: pVar
+ * Local paramvars: pVar
+ * Local temp vars: tVar
  */
 
 if (! defined('ABSPATH')) {
@@ -90,9 +90,7 @@ function tmcc_fParseUrls($pText) {
  * drafts and trashed items, which url_to_postid() cannot resolve.
  */
 function tmcc_fSlugToId($pUrl) {
-    global $wpdb;
-
-    $tPath = parse_url($pUrl, PHP_URL_PATH);
+    $tPath = wp_parse_url($pUrl, PHP_URL_PATH);
     if (empty($tPath)) {
         $tPath = $pUrl;
     }
@@ -100,19 +98,24 @@ function tmcc_fSlugToId($pUrl) {
     if ($tSlug === '') {
         return 0;
     }
-    $tId = $wpdb->get_var($wpdb->prepare(
-        "SELECT ID FROM $wpdb->posts WHERE post_name = %s"
-        . " AND post_type IN ('post','page') ORDER BY ID LIMIT 1",
-        $tSlug));
+    $tId = get_posts(array(
+        'name' => $tSlug,
+        'post_type' => array('post', 'page'),
+        'post_status' => tmcc_fStatusList(),
+        'numberposts' => 1,
+        'fields' => 'ids',
+        'orderby' => 'ID',
+        'order' => 'ASC',
+    ));
 
-    return $tId ? (int) $tId : 0;
+    return empty($tId) ? 0 : (int) $tId[0];
 }
 
 /*
  * Resolve one URL to a post or page ID. Returns 0 if not found.
  */
 function tmcc_fResolveUrl($pUrl) {
-    $tQuery = parse_url($pUrl, PHP_URL_QUERY);
+    $tQuery = wp_parse_url($pUrl, PHP_URL_QUERY);
     if (! empty($tQuery)) {
         $tArg = array();
         parse_str($tQuery, $tArg);
@@ -137,11 +140,11 @@ function tmcc_fResolveUrl($pUrl) {
  *   https://example.com/2026/05/my-post/  ->  /2026/05/my-post/
  */
 function tmcc_fUrlPath($pUrl) {
-    $tPath = parse_url($pUrl, PHP_URL_PATH);
+    $tPath = wp_parse_url($pUrl, PHP_URL_PATH);
     if (empty($tPath)) {
         $tPath = '/';
     }
-    $tQuery = parse_url($pUrl, PHP_URL_QUERY);
+    $tQuery = wp_parse_url($pUrl, PHP_URL_QUERY);
     if (! empty($tQuery)) {
         $tPath .= '?' . $tQuery;
     }
@@ -514,7 +517,8 @@ function tmcc_fSweepUploads() {
         if (! in_array($tThis, $tExt)) {
             continue;
         }
-        if (@unlink($tPath)) {
+        wp_delete_file($tPath);
+        if (! file_exists($tPath)) {
             $tCount++;
         }
     }
@@ -532,9 +536,15 @@ function tmcc_fSweepUploads() {
  * tried, and the year folder can go in the same pass.
  */
 function tmcc_fPruneDirs() {
+    global $wp_filesystem;
+
     $tUp = wp_upload_dir();
     if (! empty($tUp['error']) || empty($tUp['basedir'])
         || ! is_dir($tUp['basedir'])) {
+        return 0;
+    }
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    if (! WP_Filesystem()) {
         return 0;
     }
     $tSkip = tmcc_fSkipDirs();
@@ -565,7 +575,8 @@ function tmcc_fPruneDirs() {
 
     $tCount = 0;
     foreach ($tList as $tPath) {
-        if (@rmdir($tPath)) {
+        // Not recursive, so only empty directories are removed.
+        if ($wp_filesystem->rmdir($tPath, false)) {
             $tCount++;
         }
     }
@@ -573,18 +584,9 @@ function tmcc_fPruneDirs() {
 }
 
 /*
- * Read one textarea from POST, unslashed and sanitized.
- */
-function tmcc_fPostText($pName) {
-    if (! isset($_POST[$pName])) {
-        return '';
-    }
-    return sanitize_textarea_field(wp_unslash($_POST[$pName]));
-}
-
-/*
  * Handle the List and Delete buttons. Sets the globals used by
- * tmcc_fRenderPage().
+ * tmcc_fRenderPage(). All $_POST reads are done here, after the nonce
+ * is verified.
  */
 function tmcc_fHandlePost() {
     global $tmcc_gNotice, $tmcc_gDelPost, $tmcc_gDelPage;
@@ -597,10 +599,14 @@ function tmcc_fHandlePost() {
         wp_die('You do not have permission to use MakeCore.');
     }
 
-    $tKeepPost = tmcc_fPostText('mcKeepPosts');
-    $tKeepPage = tmcc_fPostText('mcKeepPages');
-    $tmcc_gDelPost = tmcc_fPostText('mcDelPosts');
-    $tmcc_gDelPage = tmcc_fPostText('mcDelPages');
+    $tKeepPost = isset($_POST['mcKeepPosts'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcKeepPosts'])) : '';
+    $tKeepPage = isset($_POST['mcKeepPages'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcKeepPages'])) : '';
+    $tmcc_gDelPost = isset($_POST['mcDelPosts'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcDelPosts'])) : '';
+    $tmcc_gDelPage = isset($_POST['mcDelPages'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcDelPages'])) : '';
     update_option(tmcc_cOption,
         array('posts' => $tKeepPost, 'pages' => $tKeepPage));
 
@@ -648,12 +654,12 @@ function tmcc_fRenderPage() {
     }
     tmcc_fHandlePost();
 
+    // tmcc_fHandlePost() saves the posted keep lists to this option,
+    // so it always holds the latest values.
     $tSaved = get_option(tmcc_cOption,
         array('posts' => '', 'pages' => ''));
-    $tKeepPost = isset($_POST['mcKeepPosts'])
-        ? tmcc_fPostText('mcKeepPosts') : $tSaved['posts'];
-    $tKeepPage = isset($_POST['mcKeepPages'])
-        ? tmcc_fPostText('mcKeepPages') : $tSaved['pages'];
+    $tKeepPost = $tSaved['posts'];
+    $tKeepPage = $tSaved['pages'];
     if ($tmcc_gDelPost === null) {
         $tmcc_gDelPost = '';
     }
@@ -673,7 +679,7 @@ function tmcc_fRenderPage() {
         with any media file they no longer refer to and any
         unclaimed file left in the uploads directory.</p>
         <p><b>For help <a
-        href="https://github.com/TurtleEngr/WP-turtle-make-civ-core/blob/main/README.md"
+        href="https://turtleengr.github.io/WP-turtle-make-civ-core/"
         target="_blank">Click Here</a></b></p>
 
         <?php foreach ($tmcc_gNotice as $tNote) { ?>
