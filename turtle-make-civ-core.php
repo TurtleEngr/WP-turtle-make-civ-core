@@ -1,43 +1,53 @@
 <?php
 /*
- * Plugin Name: MakeCore
- * Plugin URI: https://github.com/TurtleEngr/WP-make-core/tree/main
+ * Plugin Name: Turtle Make Civ Core
+ * Plugin URI: https://github.com/TurtleEngr/WP-turtle-make-civ-core/
  * Description: Make the current WordPress site ready to be a core site.
  * Version:     VERSION
- * Text Domain: makecore
+ * Requires at least: 6.0
+ * Requires Plugins: contact-form-7, flamingo
  * Author:      TurtleEngr
  * Author URI: https://github.com/TurtleEngr
  * License:     GPL-2.0
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  */
 
+/*
+ * Naming Convention:
+ * Constant prefix: tmcc_c
+ * Global variable prefix: tmcc_g
+ * Function prefix: tmcc_f
+ * Local paramvars: pVar
+ * Local temp vars: tVar
+ */
+
 if (! defined('ABSPATH')) {
     exit;
 }
 
-define('cMcVersion', 'VERSION');
-define('cMcOption', 'makecore_keep_lists');
-define('cMcCap', 'manage_options');
-define('cMcNonce', 'makecore_action');
+define('tmcc_cVersion', 'VERSION');
+define('tmcc_cOption', 'makecore_keep_lists');
+define('tmcc_cCap', 'manage_options');
+define('tmcc_cNonce', 'makecore_action');
 
-$gMcNotice = array();  // Messages shown at the top of the page
-$gMcDelPost = null;    // Contents of the "Delete Posts" box
-$gMcDelPage = null;    // Contents of the "Delete Pages" box
+$tmcc_gNotice = array();  // Messages shown at the top of the page
+$tmcc_gDelPost = null;    // Contents of the "Delete Posts" box
+$tmcc_gDelPage = null;    // Contents of the "Delete Pages" box
 
-add_action('admin_menu', 'fMcAddMenu');
+add_action('admin_menu', 'tmcc_fAddMenu');
 
 /*
  * Add the MakeCore page under the Settings menu.
  */
-function fMcAddMenu() {
-    add_options_page('MakeCore', 'MakeCore', cMcCap, 'makecore',
-        'fMcRenderPage');
+function tmcc_fAddMenu() {
+    add_options_page('MakeCore', 'MakeCore', tmcc_cCap, 'makecore',
+        'tmcc_fRenderPage');
 }
 
 /*
  * Post and page statuses MakeCore considers. Includes trash.
  */
-function fMcStatusList() {
+function tmcc_fStatusList() {
     return array('publish', 'future', 'draft', 'pending', 'private',
         'trash');
 }
@@ -46,7 +56,7 @@ function fMcStatusList() {
  * IDs that are never listed or deleted: the static front page and
  * the posts page, if they are set.
  */
-function fMcForcedKeep() {
+function tmcc_fForcedKeep() {
     $tKeep = array();
     $tId = (int) get_option('page_on_front');
     if ($tId > 0) {
@@ -63,7 +73,7 @@ function fMcForcedKeep() {
  * Split textarea text into a list of trimmed URLs. Blank lines and
  * lines starting with "#" are ignored.
  */
-function fMcParseUrls($pText) {
+function tmcc_fParseUrls($pText) {
     $tList = array();
     foreach (explode("\n", $pText) as $tLine) {
         $tLine = trim($tLine);
@@ -79,10 +89,8 @@ function fMcParseUrls($pText) {
  * Look up a post or page ID by its slug, in any status. Used for
  * drafts and trashed items, which url_to_postid() cannot resolve.
  */
-function fMcSlugToId($pUrl) {
-    global $wpdb;
-
-    $tPath = parse_url($pUrl, PHP_URL_PATH);
+function tmcc_fSlugToId($pUrl) {
+    $tPath = wp_parse_url($pUrl, PHP_URL_PATH);
     if (empty($tPath)) {
         $tPath = $pUrl;
     }
@@ -90,19 +98,24 @@ function fMcSlugToId($pUrl) {
     if ($tSlug === '') {
         return 0;
     }
-    $tId = $wpdb->get_var($wpdb->prepare(
-        "SELECT ID FROM $wpdb->posts WHERE post_name = %s"
-        . " AND post_type IN ('post','page') ORDER BY ID LIMIT 1",
-        $tSlug));
+    $tId = get_posts(array(
+        'name' => $tSlug,
+        'post_type' => array('post', 'page'),
+        'post_status' => tmcc_fStatusList(),
+        'numberposts' => 1,
+        'fields' => 'ids',
+        'orderby' => 'ID',
+        'order' => 'ASC',
+    ));
 
-    return $tId ? (int) $tId : 0;
+    return empty($tId) ? 0 : (int) $tId[0];
 }
 
 /*
  * Resolve one URL to a post or page ID. Returns 0 if not found.
  */
-function fMcResolveUrl($pUrl) {
-    $tQuery = parse_url($pUrl, PHP_URL_QUERY);
+function tmcc_fResolveUrl($pUrl) {
+    $tQuery = wp_parse_url($pUrl, PHP_URL_QUERY);
     if (! empty($tQuery)) {
         $tArg = array();
         parse_str($tQuery, $tArg);
@@ -117,7 +130,7 @@ function fMcResolveUrl($pUrl) {
     if ($tId > 0) {
         return $tId;
     }
-    return fMcSlugToId($pUrl);
+    return tmcc_fSlugToId($pUrl);
 }
 
 /*
@@ -126,12 +139,12 @@ function fMcResolveUrl($pUrl) {
  * resolve. For example:
  *   https://example.com/2026/05/my-post/  ->  /2026/05/my-post/
  */
-function fMcUrlPath($pUrl) {
-    $tPath = parse_url($pUrl, PHP_URL_PATH);
+function tmcc_fUrlPath($pUrl) {
+    $tPath = wp_parse_url($pUrl, PHP_URL_PATH);
     if (empty($tPath)) {
         $tPath = '/';
     }
-    $tQuery = parse_url($pUrl, PHP_URL_QUERY);
+    $tQuery = wp_parse_url($pUrl, PHP_URL_QUERY);
     if (! empty($tQuery)) {
         $tPath .= '?' . $tQuery;
     }
@@ -142,10 +155,10 @@ function fMcUrlPath($pUrl) {
  * Every ID of the given post types, in all statuses. pType is an
  * array, such as array('post') or array('post', 'page').
  */
-function fMcAllIds($pType) {
+function tmcc_fAllIds($pType) {
     return get_posts(array(
         'post_type' => $pType,
-        'post_status' => fMcStatusList(),
+        'post_status' => tmcc_fStatusList(),
         'numberposts' => -1,
         'fields' => 'ids',
         'orderby' => 'ID',
@@ -158,10 +171,10 @@ function fMcAllIds($pType) {
  * URLs that do not resolve, or that resolve to the other type, are
  * added to pBad.
  */
-function fMcKeepIds($pText, $pType, &$pBad) {
+function tmcc_fKeepIds($pText, $pType, &$pBad) {
     $tIds = array();
-    foreach (fMcParseUrls($pText) as $tUrl) {
-        $tId = fMcResolveUrl($tUrl);
+    foreach (tmcc_fParseUrls($pText) as $tUrl) {
+        $tId = tmcc_fResolveUrl($tUrl);
         if ($tId <= 0) {
             $pBad[] = $tUrl . ' (no matching post or page)';
             continue;
@@ -179,15 +192,15 @@ function fMcKeepIds($pText, $pType, &$pBad) {
  * Build the delete list for one type: the path of every item of
  * type pType that is not on the matching keep list, sorted by path.
  */
-function fMcMakeList($pKeepText, $pType, &$pBad) {
-    $tKeep = array_merge(fMcKeepIds($pKeepText, $pType, $pBad),
-        fMcForcedKeep());
+function tmcc_fMakeList($pKeepText, $pType, &$pBad) {
+    $tKeep = array_merge(tmcc_fKeepIds($pKeepText, $pType, $pBad),
+        tmcc_fForcedKeep());
     $tOut = array();
-    foreach (fMcAllIds(array($pType)) as $tId) {
+    foreach (tmcc_fAllIds(array($pType)) as $tId) {
         if (in_array($tId, $tKeep)) {
             continue;
         }
-        $tOut[] = fMcUrlPath(get_permalink($tId));
+        $tOut[] = tmcc_fUrlPath(get_permalink($tId));
     }
     sort($tOut);
     return implode("\n", $tOut);
@@ -197,11 +210,11 @@ function fMcMakeList($pKeepText, $pType, &$pBad) {
  * Permanently delete the posts and pages named in pText. Returns the
  * number deleted. Lines that could not be used are added to pBad.
  */
-function fMcDeleteUrls($pText, &$pBad) {
-    $tKeep = fMcForcedKeep();
+function tmcc_fDeleteUrls($pText, &$pBad) {
+    $tKeep = tmcc_fForcedKeep();
     $tCount = 0;
-    foreach (fMcParseUrls($pText) as $tUrl) {
-        $tId = fMcResolveUrl($tUrl);
+    foreach (tmcc_fParseUrls($pText) as $tUrl) {
+        $tId = tmcc_fResolveUrl($tUrl);
         if ($tId <= 0) {
             $pBad[] = $tUrl . ' (no matching post or page)';
             continue;
@@ -228,9 +241,9 @@ function fMcDeleteUrls($pText, &$pBad) {
  * Delete every revision of the remaining posts and pages. Returns
  * the number of revisions deleted.
  */
-function fMcPurgeRevisions() {
+function tmcc_fPurgeRevisions() {
     $tCount = 0;
-    foreach (fMcAllIds(array('post', 'page')) as $tId) {
+    foreach (tmcc_fAllIds(array('post', 'page')) as $tId) {
         $tRevList = wp_get_post_revisions($tId,
             array('fields' => 'ids'));
         foreach ($tRevList as $tRev) {
@@ -244,9 +257,9 @@ function fMcPurgeRevisions() {
 
 /*
  * Every attachment ID. Attachments use the "inherit" status, so
- * fMcStatusList() does not apply to them.
+ * tmcc_fStatusList() does not apply to them.
  */
-function fMcAllMediaIds() {
+function tmcc_fAllMediaIds() {
     return get_posts(array(
         'post_type' => 'attachment',
         'post_status' => 'any',
@@ -261,9 +274,9 @@ function fMcAllMediaIds() {
  * The content and excerpt of every remaining post and page, joined
  * into one string. This is what is searched for media references.
  */
-function fMcRemainText() {
+function tmcc_fRemainText() {
     $tText = '';
-    foreach (fMcAllIds(array('post', 'page')) as $tId) {
+    foreach (tmcc_fAllIds(array('post', 'page')) as $tId) {
         $tPost = get_post($tId);
         if ($tPost) {
             $tText .= $tPost->post_content . "\n"
@@ -278,7 +291,7 @@ function fMcRemainText() {
  * logo, and the header and background images. Deleting these would
  * break the look of the core site.
  */
-function fMcForcedKeepMedia() {
+function tmcc_fForcedKeepMedia() {
     $tKeep = array();
     $tKeep[] = (int) get_option('site_icon');
     $tKeep[] = (int) get_option('site_logo');
@@ -303,9 +316,9 @@ function fMcForcedKeepMedia() {
  * featured images, "wp-image-NNN" classes, and gallery shortcodes.
  * Being uploaded to a post (post_parent) does not count.
  */
-function fMcUsedMediaIds($pText) {
+function tmcc_fUsedMediaIds($pText) {
     $tUsed = array();
-    foreach (fMcAllIds(array('post', 'page')) as $tId) {
+    foreach (tmcc_fAllIds(array('post', 'page')) as $tId) {
         $tThumb = (int) get_post_thumbnail_id($tId);
         if ($tThumb > 0) {
             $tUsed[] = $tThumb;
@@ -338,7 +351,7 @@ function fMcUsedMediaIds($pText) {
  * word "photo" in a sentence. A .webp or .avif copy made by an
  * image optimizer also counts.
  */
-function fMcFileInText($pId, $pText) {
+function tmcc_fFileInText($pId, $pText) {
     $tFile = get_post_meta($pId, '_wp_attached_file', true);
     if (empty($tFile)) {
         return false;
@@ -368,16 +381,16 @@ function fMcFileInText($pId, $pText) {
  * Call this after the posts and pages have been deleted, so that
  * media used only by them is seen as unused.
  */
-function fMcPurgeMedia() {
-    $tText = fMcRemainText();
-    $tKeep = array_merge(fMcForcedKeepMedia(),
-        fMcUsedMediaIds($tText));
+function tmcc_fPurgeMedia() {
+    $tText = tmcc_fRemainText();
+    $tKeep = array_merge(tmcc_fForcedKeepMedia(),
+        tmcc_fUsedMediaIds($tText));
     $tCount = 0;
-    foreach (fMcAllMediaIds() as $tId) {
+    foreach (tmcc_fAllMediaIds() as $tId) {
         if (in_array($tId, $tKeep)) {
             continue;
         }
-        if (fMcFileInText($tId, $tText)) {
+        if (tmcc_fFileInText($tId, $tText)) {
             continue;
         }
         if (wp_delete_attachment($tId, true)) {
@@ -392,7 +405,7 @@ function fMcPurgeMedia() {
  * Anything else (.php, .htaccess, .css, .js, .zip, .log) is left
  * alone, so protective files, plugin output, and backups survive.
  */
-function fMcMediaExt() {
+function tmcc_fMediaExt() {
     return array('jpg', 'jpeg', 'jpe', 'png', 'gif', 'webp', 'avif',
         'bmp', 'tif', 'tiff', 'ico', 'heic', 'heif', 'svg', 'svgz',
         'mp3', 'm4a', 'ogg', 'oga', 'wav', 'flac', 'mp4', 'm4v',
@@ -406,7 +419,7 @@ function fMcMediaExt() {
  * plugin data, form uploads, caches, and, on a multisite network,
  * the media belonging to the other sites.
  */
-function fMcSkipDirs() {
+function tmcc_fSkipDirs() {
     return array('sites', 'woocommerce_uploads', 'wc-logs',
         'updraft', 'backwpup', 'ai1wm-backups', 'backupbuddy',
         'wpvivid', 'elementor', 'et-cache', 'cache', 'gravity_forms',
@@ -419,9 +432,9 @@ function fMcSkipDirs() {
  * .webp or .avif copy an image optimizer made alongside them.
  * Returned as a lookup keyed by normalized full path.
  */
-function fMcKeptFiles() {
+function tmcc_fKeptFiles() {
     $tKeep = array();
-    foreach (fMcAllMediaIds() as $tId) {
+    foreach (tmcc_fAllMediaIds() as $tId) {
         $tFile = get_attached_file($tId);
         if (empty($tFile)) {
             continue;
@@ -458,22 +471,22 @@ function fMcKeptFiles() {
  * the media library, left-overs from attachments deleted long ago,
  * and thumbnail sizes WordPress no longer tracks.
  *
- * Only the extensions in fMcMediaExt() are removed, and the
- * directories in fMcSkipDirs() are skipped whole. Returns the
+ * Only the extensions in tmcc_fMediaExt() are removed, and the
+ * directories in tmcc_fSkipDirs() are skipped whole. Returns the
  * number of files deleted.
  *
- * Call this last, after fMcPurgeMedia(), so that the files of the
+ * Call this last, after tmcc_fPurgeMedia(), so that the files of the
  * attachments it deleted are already gone.
  */
-function fMcSweepUploads() {
+function tmcc_fSweepUploads() {
     $tUp = wp_upload_dir();
     if (! empty($tUp['error']) || empty($tUp['basedir'])
         || ! is_dir($tUp['basedir'])) {
         return 0;
     }
-    $tKeep = fMcKeptFiles();
-    $tSkip = fMcSkipDirs();
-    $tExt = fMcMediaExt();
+    $tKeep = tmcc_fKeptFiles();
+    $tSkip = tmcc_fSkipDirs();
+    $tExt = tmcc_fMediaExt();
     $tCount = 0;
 
     $tDir = new RecursiveDirectoryIterator($tUp['basedir'],
@@ -504,7 +517,8 @@ function fMcSweepUploads() {
         if (! in_array($tThis, $tExt)) {
             continue;
         }
-        if (@unlink($tPath)) {
+        wp_delete_file($tPath);
+        if (! file_exists($tPath)) {
             $tCount++;
         }
     }
@@ -514,20 +528,26 @@ function fMcSweepUploads() {
 /*
  * Remove the directories left empty by the sweep, such as the year
  * and month folders whose files are all gone. The uploads
- * directory itself is kept, and the directories in fMcSkipDirs()
+ * directory itself is kept, and the directories in tmcc_fSkipDirs()
  * are neither entered nor removed. Returns the number removed.
  *
- * Call this after fMcSweepUploads(). Directories are tried deepest
+ * Call this after tmcc_fSweepUploads(). Directories are tried deepest
  * first, so a month folder is gone before its year folder is
  * tried, and the year folder can go in the same pass.
  */
-function fMcPruneDirs() {
+function tmcc_fPruneDirs() {
+    global $wp_filesystem;
+
     $tUp = wp_upload_dir();
     if (! empty($tUp['error']) || empty($tUp['basedir'])
         || ! is_dir($tUp['basedir'])) {
         return 0;
     }
-    $tSkip = fMcSkipDirs();
+    require_once ABSPATH . 'wp-admin/includes/file.php';
+    if (! WP_Filesystem()) {
+        return 0;
+    }
+    $tSkip = tmcc_fSkipDirs();
     $tList = array();
 
     $tDir = new RecursiveDirectoryIterator($tUp['basedir'],
@@ -555,7 +575,8 @@ function fMcPruneDirs() {
 
     $tCount = 0;
     foreach ($tList as $tPath) {
-        if (@rmdir($tPath)) {
+        // Not recursive, so only empty directories are removed.
+        if ($wp_filesystem->rmdir($tPath, false)) {
             $tCount++;
         }
     }
@@ -563,57 +584,52 @@ function fMcPruneDirs() {
 }
 
 /*
- * Read one textarea from POST, unslashed and sanitized.
- */
-function fMcPostText($pName) {
-    if (! isset($_POST[$pName])) {
-        return '';
-    }
-    return sanitize_textarea_field(wp_unslash($_POST[$pName]));
-}
-
-/*
  * Handle the List and Delete buttons. Sets the globals used by
- * fMcRenderPage().
+ * tmcc_fRenderPage(). All $_POST reads are done here, after the nonce
+ * is verified.
  */
-function fMcHandlePost() {
-    global $gMcNotice, $gMcDelPost, $gMcDelPage;
+function tmcc_fHandlePost() {
+    global $tmcc_gNotice, $tmcc_gDelPost, $tmcc_gDelPage;
 
     if (empty($_POST['mcAction'])) {
         return;
     }
-    check_admin_referer(cMcNonce, 'mcNonce');
-    if (! current_user_can(cMcCap)) {
+    check_admin_referer(tmcc_cNonce, 'mcNonce');
+    if (! current_user_can(tmcc_cCap)) {
         wp_die('You do not have permission to use MakeCore.');
     }
 
-    $tKeepPost = fMcPostText('mcKeepPosts');
-    $tKeepPage = fMcPostText('mcKeepPages');
-    $gMcDelPost = fMcPostText('mcDelPosts');
-    $gMcDelPage = fMcPostText('mcDelPages');
-    update_option(cMcOption,
+    $tKeepPost = isset($_POST['mcKeepPosts'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcKeepPosts'])) : '';
+    $tKeepPage = isset($_POST['mcKeepPages'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcKeepPages'])) : '';
+    $tmcc_gDelPost = isset($_POST['mcDelPosts'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcDelPosts'])) : '';
+    $tmcc_gDelPage = isset($_POST['mcDelPages'])
+        ? sanitize_textarea_field(wp_unslash($_POST['mcDelPages'])) : '';
+    update_option(tmcc_cOption,
         array('posts' => $tKeepPost, 'pages' => $tKeepPage));
 
     $tBad = array();
     $tAction = sanitize_key(wp_unslash($_POST['mcAction']));
 
     if ($tAction === 'list') {
-        $gMcDelPost = fMcMakeList($tKeepPost, 'post', $tBad);
-        $gMcDelPage = fMcMakeList($tKeepPage, 'page', $tBad);
-        $gMcNotice[] = array('notice-info',
+        $tmcc_gDelPost = tmcc_fMakeList($tKeepPost, 'post', $tBad);
+        $tmcc_gDelPage = tmcc_fMakeList($tKeepPage, 'page', $tBad);
+        $tmcc_gNotice[] = array('notice-info',
             sprintf('%d posts and %d pages listed for deletion.',
-                count(fMcParseUrls($gMcDelPost)),
-                count(fMcParseUrls($gMcDelPage))));
+                count(tmcc_fParseUrls($tmcc_gDelPost)),
+                count(tmcc_fParseUrls($tmcc_gDelPage))));
     } elseif ($tAction === 'delete') {
-        $tNum = fMcDeleteUrls($gMcDelPost . "\n" . $gMcDelPage,
+        $tNum = tmcc_fDeleteUrls($tmcc_gDelPost . "\n" . $tmcc_gDelPage,
             $tBad);
-        $tRev = fMcPurgeRevisions();
-        $tMedia = fMcPurgeMedia();
-        $tFile = fMcSweepUploads();
-        $tDir = fMcPruneDirs();
-        $gMcDelPost = '';
-        $gMcDelPage = '';
-        $gMcNotice[] = array('notice-success',
+        $tRev = tmcc_fPurgeRevisions();
+        $tMedia = tmcc_fPurgeMedia();
+        $tFile = tmcc_fSweepUploads();
+        $tDir = tmcc_fPruneDirs();
+        $tmcc_gDelPost = '';
+        $tmcc_gDelPage = '';
+        $tmcc_gNotice[] = array('notice-success',
             sprintf('Deleted %d posts and pages, and %d revisions'
                 . ' from what remains. Removed %d unused media'
                 . ' files, %d orphan files, and %d empty folders'
@@ -622,7 +638,7 @@ function fMcHandlePost() {
     }
 
     if (! empty($tBad)) {
-        $gMcNotice[] = array('notice-warning',
+        $tmcc_gNotice[] = array('notice-warning',
             'Skipped these lines: ' . implode(', ', $tBad));
     }
 }
@@ -630,25 +646,25 @@ function fMcHandlePost() {
 /*
  * Draw the MakeCore settings page.
  */
-function fMcRenderPage() {
-    global $gMcNotice, $gMcDelPost, $gMcDelPage;
+function tmcc_fRenderPage() {
+    global $tmcc_gNotice, $tmcc_gDelPost, $tmcc_gDelPage;
 
-    if (! current_user_can(cMcCap)) {
+    if (! current_user_can(tmcc_cCap)) {
         wp_die('You do not have permission to use MakeCore.');
     }
-    fMcHandlePost();
+    tmcc_fHandlePost();
 
-    $tSaved = get_option(cMcOption,
+    // tmcc_fHandlePost() saves the posted keep lists to this option,
+    // so it always holds the latest values.
+    $tSaved = get_option(tmcc_cOption,
         array('posts' => '', 'pages' => ''));
-    $tKeepPost = isset($_POST['mcKeepPosts'])
-        ? fMcPostText('mcKeepPosts') : $tSaved['posts'];
-    $tKeepPage = isset($_POST['mcKeepPages'])
-        ? fMcPostText('mcKeepPages') : $tSaved['pages'];
-    if ($gMcDelPost === null) {
-        $gMcDelPost = '';
+    $tKeepPost = $tSaved['posts'];
+    $tKeepPage = $tSaved['pages'];
+    if ($tmcc_gDelPost === null) {
+        $tmcc_gDelPost = '';
     }
-    if ($gMcDelPage === null) {
-        $gMcDelPage = '';
+    if ($tmcc_gDelPage === null) {
+        $tmcc_gDelPage = '';
     }
     $tConfirm = 'Permanently delete every post and page listed in'
         . ' the Delete Posts and Delete Pages boxes, every media'
@@ -656,24 +672,24 @@ function fMcRenderPage() {
         . ' the uploads directory? This cannot be undone.';
     ?>
     <div class="wrap">
-        <h1>MakeCore <?php echo esc_html(cMcVersion); ?></h1>
+        <h1>MakeCore <?php echo esc_html(tmcc_cVersion); ?></h1>
         <p>List the posts and pages to keep, then review what is
         left before deleting.<br> <b>Deletion is permanent,</b> and revisions
         of the surviving posts and pages are removed as well, along
         with any media file they no longer refer to and any
         unclaimed file left in the uploads directory.</p>
         <p><b>For help <a
-        href="https://github.com/TurtleEngr/WP-make-core/blob/main/README.md"
+        href="https://turtleengr.github.io/WP-turtle-make-civ-core/"
         target="_blank">Click Here</a></b></p>
 
-        <?php foreach ($gMcNotice as $tNote) { ?>
+        <?php foreach ($tmcc_gNotice as $tNote) { ?>
             <div class="notice <?php echo esc_attr($tNote[0]); ?>">
                 <p><?php echo esc_html($tNote[1]); ?></p>
             </div>
         <?php } ?>
 
         <form method="post">
-            <?php wp_nonce_field(cMcNonce, 'mcNonce'); ?>
+            <?php wp_nonce_field(tmcc_cNonce, 'mcNonce'); ?>
 
             <h2>Keep Posts</h2>
             <p class="description">One post URL per line.</p>
@@ -695,7 +711,7 @@ function fMcRenderPage() {
             <textarea name="mcDelPosts" rows="15" cols="100"
                 class="large-text code"
                 style="overflow:auto;"><?php
-                echo esc_textarea($gMcDelPost); ?></textarea>
+                echo esc_textarea($tmcc_gDelPost); ?></textarea>
 
             <h2>Delete Pages</h2>
             <p class="description">List fills this box with the
@@ -705,7 +721,7 @@ function fMcRenderPage() {
             <textarea name="mcDelPages" rows="15" cols="100"
                 class="large-text code"
                 style="overflow:auto;"><?php
-                echo esc_textarea($gMcDelPage); ?></textarea>
+                echo esc_textarea($tmcc_gDelPage); ?></textarea>
 
             <p class="submit">
                 <button type="submit" name="mcAction" value="list"

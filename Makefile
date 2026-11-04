@@ -1,4 +1,4 @@
-# Makefile for github.com:TurtleEngr/WP-make-core
+# Makefile for github.com:TurtleEngr/WP-turtle-make-civ-core
 
 # ----------
 # Macros
@@ -6,17 +6,22 @@
 SHELL := /bin/bash
 
 # Plugin name (slug)
-mName = turtle-make-civ-cor
+mName = turtle-make-civ-core
 
 # Repository name
 mProj = WP-$(mName)
 
+# Plugin install files
+mProduct = dist/$(mName)-VERSION.zip
+
+# Files that go in the plugin's zip file
 mBuildList = \
 	dist/$(mName) \
 	dist/$(mName)/$(mName).php \
 	dist/$(mName)/readme.txt \
 	dist/$(mName)/LICENSE
 
+# Generated files that will be put in docs/
 mDocList = \
 	docs/install-civ-core.html \
 	docs/index.html
@@ -24,6 +29,7 @@ mDocList = \
 # Get branch name
 mBranch = $$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
 
+# Location for saving the built plugin. See the rsync commands.
 mServer = moria.whyayh.com
 mPubDev = /rel/development/software/own/$(mProj)
 mPubRel = /rel/released/software/own/$(mProj)
@@ -166,7 +172,7 @@ docs/index.html : README.org VERSION
 	sed -i 's/\&amp;/\&/g' $@
 
 docs/install-civ-core.html : install-civ-core.org VERSION
-	org2html.sh -i install-civ-core.org -o $@ -s 2
+	bin/org2html.sh -i install-civ-core.org -o $@ -s 2
 	sed -i "s/VERSION/$$(cat VERSION)/" $@
 
 incMajor : VERSION
