@@ -5,7 +5,7 @@
  * Description: Make the current WordPress site ready to be a core site.
  * Version:     VERSION
  * Requires at least: 6.0
- * Requires Plugins: contact-form-7, flamingo
+ * Requires PHP: 8.0
  * Author:      TurtleEngr
  * Author URI: https://github.com/TurtleEngr
  * License:     GPL-2.0
