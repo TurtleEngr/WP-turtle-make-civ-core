@@ -1,3 +1,4 @@
+#+OPTIONS: ^:{}
 #+BEGIN_EXPORT html
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -11,9 +12,7 @@
 #+END_EXPORT
 * Turtle Make Civ Core
 
-[[https://img.shields.io/badge/version-VERSION-orange.svg][version]]
-
-[[https://img.shields.io/badge/WordPress-Compatible-blue.svg][WordPress]]
+ver-0.6.1
 
 Make the current WordPress site ready to be a core site.
 
