@@ -1,6 +1,6 @@
-=== turtle-make-civ-core ===
+=== Turtle Make Civ Core ===
 Contributors: turtle-engr
-Tags: plugin, make-core, cleanup
+Tags: make-core, cleanup
 Requires at least: 6.0
 Requires PHP: 8.0
 Tested up to: 7.1
