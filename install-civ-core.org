@@ -45,7 +45,7 @@ setup directions. Look at their directions for the details.
 + Point your browser to YOURDOMAIN. You should see the minimal site.
 + Click on the "Log In" menu, and fill ing the fields:
   + User: CivCoreAdmin@gmail.com
-  + Password: (the one you were given)
+  + Password: is1psGSZeOMifm*vPL2xHFqf
 + You should now see the admin page
 + Changes:
   + Add an admin user for yourself. Verify you can login with it.
@@ -54,8 +54,13 @@ setup directions. Look at their directions for the details.
   + Change the title of the home page.
   + Create more users as needed.
 + Get licenses and keys
-  + Claude API key - see docs at: [[https://github.com/TurtleEngr/WP-Claude-Interface/blob/develop/README.md][README.md]]
-  + Get free Wordfront plugin license for your domain (url? TBD)
-  + Get a USP Pro plugin license, if you want to use that (url? TBD)
+  + Claude API key
+    + https://github.com/turtleengr/wp-chat-bot-for-claude/
+  + Wordfence plugin free license for your domain
+    + https://www.wordfence.com/licenses
+  + Get a USP Pro plugin license, if you want to use that
+    + https://plugin-planet.com/get-license-key/
+  + YouTube Gallery, Settings, General, YouTube API Key
+    + https://plugins360.com/automatic-youtube-gallery/how-to-get-youtube-api-key/
 
 TBD - more directions to come.
